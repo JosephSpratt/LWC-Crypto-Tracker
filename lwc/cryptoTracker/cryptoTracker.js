@@ -2,6 +2,7 @@ import { LightningElement, track } from 'lwc';
 import getToken from '@salesforce/apex/CryptoTrackerHelper.getToken';
 import assetIdLookup from '@salesforce/apex/CryptoTrackerHelper.assetIdLookup';
 import getAssetInfo from '@salesforce/apex/CryptoTrackerHelper.getAssetInfo';
+import getAssetHistory from '@salesforce/apex/CryptoTrackerHelper.getAssetHistory';
 import { loadScript } from 'lightning/platformResourceLoader';
 import chartjs from '@salesforce/resourceUrl/chartjs';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
@@ -10,6 +11,7 @@ export default class CryptoTracker extends LightningElement {
     authToken;
     coinBasicInfo;
     coinFinancialInfo;
+    coinHistoryInfo;
     chart;
     config;
     hideCoinDisplays = true;
@@ -43,9 +45,9 @@ export default class CryptoTracker extends LightningElement {
             pricePercentChange30d: this.coinFinancialInfo.pricePercentChange.change30d + '%',    
             marketCap: '$' + this.coinFinancialInfo.marketCap,
             marketCapRank: this.coinFinancialInfo.marketCapRank,
-            marketCapPercentChange7d: 'Market Cap Change (7d): ' + this.coinFinancialInfo.marketCapPercentChange.change7d + '%',
-            marketCapPercentChange24h: 'Market Cap Change (24h): ' + this.coinFinancialInfo.marketCapPercentChange.change24h + '%',
-            marketCapPercentChange30d: 'Market Cap Change (30d): ' + this.coinFinancialInfo.marketCapPercentChange.change30d + '%'
+            marketCapPercentChange7d: this.coinFinancialInfo.marketCapPercentChange.change7d + '%',
+            marketCapPercentChange24h: this.coinFinancialInfo.marketCapPercentChange.change24h + '%',
+            marketCapPercentChange30d: this.coinFinancialInfo.marketCapPercentChange.change30d + '%'
         }
         return formattedCoinInfo;
     }
@@ -75,23 +77,77 @@ export default class CryptoTracker extends LightningElement {
         Promise.all([
             loadScript(this, chartjs)
         ]).then(() => {
+            var delayBetweenPoints = 10;
+            var started = {};
             let config = {
-                // The type of chart we want to create
                 type: 'line',
-                // The data for our dataset
                 data: {
-                    labels: ['24h Change', this.formateDate(this.coinFinancialInfo.timestamp)],
+                    labels: ['','', '','', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                    //this.formateDate(this.coinFinancialInfo.timestamp)
                     datasets: [{
-                        label: this.coinBasicInfo.name + ' - Market Price',
-                        data: this.calculatePriceChange(),
-                        pointBackgroundColor: 'rgba(0, 0, 0, 1)',
-                        pointStyle: 'crossRot',
+                        label: this.coinBasicInfo.name + ' - Last 24 Hours',
                         borderColor: 'rgba(0, 0, 0, 1)',
-                        backgroundColor: this.chartColour
-                    }]
+                        backgroundColor: this.chartColour,
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        data: this.calculatePriceChange(),
+                        fill: true,
+                        lineTension: 0,
+                        animation: (context) => {
+                            var delay = 0;
+                            var index = context.dataIndex;
+                            var chart = context.chart;
+                            if (!started[index]) {
+                              delay = index * delayBetweenPoints;
+                              started[index] = true;
+                            }
+                            var {x,y} = index > 0 ? chart.getDatasetMeta(0).data[index-1].getProps(['x','y'], true) : {x: 0, y: chart.scales.y.getPixelForValue(100)};
+                            
+                            return {
+                              x: {
+                                easing: "linear",
+                                duration: delayBetweenPoints,
+                                from: x,
+                                delay
+                              },
+                              y: {
+                                easing: "linear",
+                                duration: delayBetweenPoints * 500,
+                                from: y,
+                                delay
+                              },
+                              skip: {
+                                type: 'boolean',
+                                duration: delayBetweenPoints,
+                                from: true,
+                                to: false,
+                                delay: delay
+                              }
+                            };
+                          }
+                        }]
                 },
-                // Configuration options go here
-                options: {}
+                options: {
+                    layout: {
+                        padding: {
+                            left: 10,
+                            right: 20,
+                            top: 0,
+                            bottom: 0
+                        }
+                    },
+                    scales: {
+                        x: {
+                          type: 'linear'
+                        }
+                      }
+                    },
+                    plugins: [{
+                      id: 'force_line_update',
+                      beforeDatasetDraw(chart, ctx) {
+                        ctx.meta.dataset.points = ctx.meta.data;
+                    }
+                }]
             };
             const ctx = this.template.querySelector('canvas.donut').getContext('2d');
             this.chart = new window.Chart(ctx, config);
@@ -134,8 +190,12 @@ export default class CryptoTracker extends LightningElement {
 
     calculatePriceChange(){
         const prices = []
-        prices.push(this.percentage(this.coinFinancialInfo.price, this.coinFinancialInfo.pricePercentChange.change24h));
+        // prices.push(this.percentage(this.coinFinancialInfo.price, this.coinFinancialInfo.pricePercentChange.change24h));
+        for(let i = 0, len = this.coinHistoryInfo.length; i < len; i++){
+            prices.push(this.coinHistoryInfo[i].high);
+        }
         prices.push(this.coinFinancialInfo.price);
+        console.log(prices);
         return prices;
     }
 
@@ -157,7 +217,29 @@ export default class CryptoTracker extends LightningElement {
                         if (result.content != undefined) {
                             this.coinFinancialInfo = result.content[0];
                             console.log(this.coinFinancialInfo);
-                            this.updateChart();
+                            getAssetHistory({ticker: tickerCoin}).then(result => {
+                                console.log(result);
+                                if(result.Response == "Success"){
+                                    if(result.Data.Data != undefined){
+                                        this.coinHistoryInfo = result.Data.Data;
+                                    }else{
+                                        this.coinHistoryInfo = null;
+                                    }
+                                    this.updateChart();
+                                } else {
+                                    this.hideTickerMessage = false;
+                                }
+                                
+                            }).catch(error => {
+                                console.log(error);
+                                this.dispatchEvent(
+                                    new ShowToastEvent({
+                                        title: 'Error loading asset',
+                                        message: error.message,
+                                        variant: 'error',
+                                    }),
+                                );
+                            });
                         } else {
                             this.hideTickerMessage = false;
                         }
