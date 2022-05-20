@@ -1,6 +1,6 @@
 .c-container {    
     margin: 0;
-    min-height: calc(100vh - 250px);
+    min-height: calc(100vh - 60vh);
 }
 
 article.slds-card {
@@ -15,8 +15,41 @@ article.slds-card {
     margin-top: 0;
 }
 
+.overflow-card {
+    overflow: hidden;
+    background-color: #e8e8e6;
+}
+
 canvas {
     -moz-user-select: none;
     -webkit-user-select: none;
     -ms-user-select: none;
+}
+
+.scroll-element {
+    display: inline-block;
+    margin-right: 3.5rem;
+}
+
+.coin-scroll-ticker {
+    color: mediumblue;
+    margin-right: 0.5rem;
+    font-weight: bold;
+}
+
+.coin-price-ticker {
+    color: black;
+    margin-right: 0.2rem;
+}
+
+.percentage-red {
+    color: red;
+}
+
+.percentage-green {
+    color: green;
+}
+
+.faded-back-drop {
+    background-color: whitesmoke;
 }
