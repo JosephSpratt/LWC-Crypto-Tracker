@@ -1,0 +1,15 @@
+<apex:page lightningStylesheets="true" showHeader="false" sidebar="false">
+    <apex:includeLightning />    
+    <div id="LightningComponentid" style="margin: 3rem;"/>    
+    <script>
+    $Lightning.use("c:CryptoTrackerApp", function() {
+        $Lightning.createComponent("c:cryptoTracker",
+          { 
+          },
+          "LightningComponentid",
+          function(cmp) {
+             console.log('LWC Componenet added in VF page');
+          });
+    });
+    </script>
+</apex:page>

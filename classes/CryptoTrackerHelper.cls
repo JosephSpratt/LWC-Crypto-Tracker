@@ -37,17 +37,11 @@ public without sharing class CryptoTrackerHelper{
             req.setHeader('X-RapidAPI-Host', 'bravenewcoin.p.rapidapi.com');
             req.setHeader('X-RapidAPI-Key', braveCoin.Rapid_Key__c);
             req.setMethod('GET');
-
-            System.debug(req);
             
 
             HTTPResponse res = http.send(req);
-            System.debug(res.getBody());
-
-            System.debug(BraveCoinAssetLookupResponse.parse(res.getBody()));
             return BraveCoinAssetLookupResponse.parse(res.getBody());
         } catch (Exception e){
-            System.debug(e.getMessage());
             throw new AuraHandledException(AURA_HANDLED_EXCEPTION_ASSET_MESSAGE);
         }
     }
@@ -64,6 +58,42 @@ public without sharing class CryptoTrackerHelper{
             req.setHeader('X-RapidAPI-Key', braveCoin.Rapid_Key__c);
             req.setHeader('Authorization', 'Bearer ' + token);
             req.setMethod('GET');
+            
+
+            HTTPResponse res = http.send(req);
+            return BraveCoinAssetInfoResponse.parse(res.getBody());
+        } catch (Exception e){
+            throw new AuraHandledException(AURA_HANDLED_EXCEPTION_ASSET_MESSAGE);
+        }
+    }
+
+    @AuraEnabled
+    public static CryptoCompareAssetHistoryReponse getAssetHistory(String ticker){
+        try{
+            Http http = new Http();
+
+            CryptoCompareCreds__c cc = CryptoCompareCreds__c.getOrgDefaults();
+            HttpRequest req = new HttpRequest();
+            req.setEndpoint('https://min-api.cryptocompare.com/data/v2/histohour?fsym=' + ticker.toUpperCase() + '&tsym=USD&limit=24&toTs=-1&api_key=' + cc.Key__c);
+            req.setMethod('GET');
+            
+            HTTPResponse res = http.send(req);
+            return CryptoCompareAssetHistoryReponse.parse(res.getBody());
+        } catch (Exception e){
+            System.debug(e);
+            throw new AuraHandledException(AURA_HANDLED_EXCEPTION_ASSET_MESSAGE);
+        }
+    }
+
+    @AuraEnabled
+    public static CryptoCompareTrendingCoinsResponse getTrendingCoins(){
+        try{
+            Http http = new Http();
+
+            CryptoCompareCreds__c cc = CryptoCompareCreds__c.getOrgDefaults();
+            HttpRequest req = new HttpRequest();
+            req.setEndpoint('https://min-api.cryptocompare.com/data/top/totalvolfull?limit=20&tsym=USD&api_key=' + cc.Key__c + '&assetClass=DEFI');
+            req.setMethod('GET');
 
             System.debug(req);
             
@@ -71,8 +101,8 @@ public without sharing class CryptoTrackerHelper{
             HTTPResponse res = http.send(req);
             System.debug(res.getBody());
 
-            System.debug(BraveCoinAssetInfoResponse.parse(res.getBody()));
-            return BraveCoinAssetInfoResponse.parse(res.getBody());
+            System.debug(CryptoCompareTrendingCoinsResponse.parse(res.getBody()));
+            return CryptoCompareTrendingCoinsResponse.parse(res.getBody());
         } catch (Exception e){
             System.debug(e);
             throw new AuraHandledException(AURA_HANDLED_EXCEPTION_ASSET_MESSAGE);

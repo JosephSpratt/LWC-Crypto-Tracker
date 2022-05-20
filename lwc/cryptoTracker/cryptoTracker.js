@@ -6,12 +6,14 @@ import getAssetHistory from '@salesforce/apex/CryptoTrackerHelper.getAssetHistor
 import { loadScript } from 'lightning/platformResourceLoader';
 import chartjs from '@salesforce/resourceUrl/chartjs';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import getTrendingCoins from '@salesforce/apex/CryptoTrackerHelper.getTrendingCoins';
 
 export default class CryptoTracker extends LightningElement {
     authToken;
     coinBasicInfo;
     coinFinancialInfo;
     coinHistoryInfo;
+    @track trendingCoins = [];
     chart;
     config;
     hideCoinDisplays = true;
@@ -30,46 +32,95 @@ export default class CryptoTracker extends LightningElement {
         return this.coinFinancialInfo.pricePercentChange.change24h > 0 ? 'slds-text-body_medium slds-text-color_success' : 'slds-text-body_medium slds-text-color_error';
     }
 
+    get pricePercentChangeClass7d(){
+        return this.coinFinancialInfo.pricePercentChange.change7d > 0 ? 'slds-card__header-title slds-text-body_small slds-text-color_weak slds-m-top_xx-small slds-col slds-size_2-of-3 percentage-green' : 'slds-card__header-title slds-text-body_small slds-text-color_weak slds-m-top_xx-small slds-col slds-size_2-of-3 percentage-red';
+    }
+
+    get pricePercentChangeClass24h(){
+        return this.coinFinancialInfo.pricePercentChange.change24h > 0 ? 'slds-card__header-title slds-text-body_small slds-text-color_weak slds-m-top_xx-small slds-col slds-size_2-of-3 percentage-green' : 'slds-card__header-title slds-text-body_small slds-text-color_weak slds-m-top_xx-small slds-col slds-size_2-of-3 percentage-red';
+    }
+
+    get pricePercentChangeClass30d(){
+        return this.coinFinancialInfo.pricePercentChange.change30d > 0 ? 'slds-card__header-title slds-text-body_small slds-text-color_weak slds-m-top_xx-small slds-col slds-size_2-of-3 percentage-green' : 'slds-card__header-title slds-text-body_small slds-text-color_weak slds-m-top_xx-small slds-col slds-size_2-of-3 percentage-red';
+    }
+
+    get volumePercentChangeClass7d(){
+        return this.coinFinancialInfo.volumePercentChange.change7d > 0 ? 'slds-card__header-title slds-text-body_small slds-text-color_weak slds-m-top_xx-small slds-col slds-size_2-of-3 percentage-green' : 'slds-card__header-title slds-text-body_small slds-text-color_weak slds-m-top_xx-small slds-col slds-size_2-of-3 percentage-red';
+    }
+
+    get volumePercentChangeClass24h(){
+        return this.coinFinancialInfo.volumePercentChange.change24h > 0 ? 'slds-card__header-title slds-text-body_small slds-text-color_weak slds-m-top_xx-small slds-col slds-size_2-of-3 percentage-green' : 'slds-card__header-title slds-text-body_small slds-text-color_weak slds-m-top_xx-small slds-col slds-size_2-of-3 percentage-red';
+    }
+
+    get volumePercentChangeClass30d(){
+        return this.coinFinancialInfo.volumePercentChange.change30d > 0 ? 'slds-card__header-title slds-text-body_small slds-text-color_weak slds-m-top_xx-small slds-col slds-size_2-of-3 percentage-green' : 'slds-card__header-title slds-text-body_small slds-text-color_weak slds-m-top_xx-small slds-col slds-size_2-of-3 percentage-red';
+    }
+
     get chartColour(){
         return this.coinFinancialInfo.pricePercentChange.change24h > 0 ? 'rgba(22, 187, 22, 1)' : 'rgba(195, 2, 2, 1)';
+    }
+
+    get trendingCoins(){
+        return this.trendingCoins;
     }
 
     get allCoinInfo(){
         const formattedCoinInfo = {
             name: this.coinBasicInfo.name.toUpperCase(),
             url: this.coinBasicInfo.url,
-            price: '$' + this.coinFinancialInfo.price.toFixed(2),
+            price: '$' + this.coinHistoryInfo[this.coinHistoryInfo.length - 1].close,
             pricePercentChange24hHeader: this.coinFinancialInfo.pricePercentChange.change24h + '%',
             pricePercentChange7d: this.coinFinancialInfo.pricePercentChange.change7d + '%',
             pricePercentChange24h: this.coinFinancialInfo.pricePercentChange.change24h + '%',
-            pricePercentChange30d: this.coinFinancialInfo.pricePercentChange.change30d + '%',    
-            marketCap: '$' + this.coinFinancialInfo.marketCap,
-            marketCapRank: this.coinFinancialInfo.marketCapRank,
-            marketCapPercentChange7d: this.coinFinancialInfo.marketCapPercentChange.change7d + '%',
-            marketCapPercentChange24h: this.coinFinancialInfo.marketCapPercentChange.change24h + '%',
-            marketCapPercentChange30d: this.coinFinancialInfo.marketCapPercentChange.change30d + '%'
+            pricePercentChange30d: this.coinFinancialInfo.pricePercentChange.change30d + '%',
+            volume: '$' + this.coinFinancialInfo.volume,
+            volumeRank: this.coinFinancialInfo.volumeRank,
+            volumePercentChange7d: this.coinFinancialInfo.volumePercentChange.change7d + '%',
+            volumePercentChange24h: this.coinFinancialInfo.volumePercentChange.change24h + '%',
+            volumePercentChange30d: this.coinFinancialInfo.volumePercentChange.change30d + '%'
         }
         return formattedCoinInfo;
     }
 
     connectedCallback() {
         this.getAuthToken();
+        this.getTrendingCoins();
+    }
+
+    getTrendingCoins(){
+        getTrendingCoins().then(result => {
+            result.Data.map(row => {
+                let percDec = parseFloat(row.RAW.USD.CHANGEPCTHOUR);
+                let percH = percDec.toFixed(2);
+                let coin = row.RAW.USD.FROMSYMBOL;
+                let priceDecimal = parseFloat(row.RAW.USD.PRICE);
+                let price = priceDecimal.toFixed(2);
+                let className = this.percentageClass(percH);
+                this.trendingCoins.push({coin: coin, price: price, percH:percH, className: className});
+            })
+            
+        }).catch(error => {
+            this.dispatchError(error);
+        })
     }
 
     getAuthToken() {
         getToken().then(result => {
             this.authToken = result;
-            console.log(result);
+            
         }).catch(error => {
-            console.log(error);
+            this.dispatchError(error);
+        })
+    }
+
+    dispatchError(error){      
             this.dispatchEvent(
                 new ShowToastEvent({
-                    title: 'Error getting auth token',
-                    message: error.message,
-                    variant: 'error',
-                }),
-            );
-        })
+                title: 'Error getting auth token',
+                message: error.message,
+                variant: 'error',
+            }),
+        );
     }
 
     initialiseChart() {
@@ -82,8 +133,7 @@ export default class CryptoTracker extends LightningElement {
             let config = {
                 type: 'line',
                 data: {
-                    labels: ['','', '','', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                    //this.formateDate(this.coinFinancialInfo.timestamp)
+                    labels: ['','', '','', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
                     datasets: [{
                         label: this.coinBasicInfo.name + ' - Last 24 Hours',
                         borderColor: 'rgba(0, 0, 0, 1)',
@@ -102,7 +152,6 @@ export default class CryptoTracker extends LightningElement {
                               started[index] = true;
                             }
                             var {x,y} = index > 0 ? chart.getDatasetMeta(0).data[index-1].getProps(['x','y'], true) : {x: 0, y: chart.scales.y.getPixelForValue(100)};
-                            
                             return {
                               x: {
                                 easing: "linear",
@@ -124,8 +173,8 @@ export default class CryptoTracker extends LightningElement {
                                 delay: delay
                               }
                             };
-                          }
-                        }]
+                        }
+                    }]
                 },
                 options: {
                     layout: {
@@ -152,21 +201,24 @@ export default class CryptoTracker extends LightningElement {
             const ctx = this.template.querySelector('canvas.donut').getContext('2d');
             this.chart = new window.Chart(ctx, config);
         })
-            .catch(error => {
-                this.dispatchEvent(
-                    new ShowToastEvent({
-                        title: 'Error loading ChartJS',
-                        message: error.message,
-                        variant: 'error',
-                    }),
-                );
-            });
+        .catch(error => {
+            this.dispatchError(error);
+        });
+    }
+
+    percentageClass(percentage){
+        let className;
+        if(percentage.includes('-')){
+            className = 'percentage-red';
+        } else {
+            className = 'percentage-green';
+        }
+        return className;
     }
 
     updateChart() {
         this.hideCoinDisplays = false;
         if (this.chartjsInitialized) {
-            console.log("update here");
             this.updateChartDataAndConfig();
         }
         else {
@@ -175,11 +227,9 @@ export default class CryptoTracker extends LightningElement {
     }
 
     updateChartDataAndConfig(){
-        console.log(this.chart);
         this.chart.data.datasets[0].label = this.coinBasicInfo.name + ' - Market Price';
         this.chart.data.datasets[0].backgroundColor = this.chartColour;
         this.chart.data.datasets[0].data = this.calculatePriceChange();
-        this.chart.data.labels = ['24h Change', this.formateDate(this.coinFinancialInfo.timestamp)];
         this.chart.update();
     }
 
@@ -190,17 +240,13 @@ export default class CryptoTracker extends LightningElement {
 
     calculatePriceChange(){
         const prices = []
-        // prices.push(this.percentage(this.coinFinancialInfo.price, this.coinFinancialInfo.pricePercentChange.change24h));
         for(let i = 0, len = this.coinHistoryInfo.length; i < len; i++){
-            prices.push(this.coinHistoryInfo[i].high);
+            prices.push(this.coinHistoryInfo[i].close);
         }
-        prices.push(this.coinFinancialInfo.price);
-        console.log(prices);
         return prices;
     }
 
     percentage(num, per){
-        console.log(per + ' ' + num + ' ' + (num/100)*per );
         return num - (num/100)*per;
     }
 
@@ -212,13 +258,10 @@ export default class CryptoTracker extends LightningElement {
                 if (result.content != undefined) {
                     this.hideTickerMessage = true;
                     this.coinBasicInfo = result.content[0];
-                    console.log(this.coinBasicInfo);
                     getAssetInfo({ assetId: this.coinBasicInfo.id, token: this.authToken }).then(result => {
                         if (result.content != undefined) {
                             this.coinFinancialInfo = result.content[0];
-                            console.log(this.coinFinancialInfo);
                             getAssetHistory({ticker: tickerCoin}).then(result => {
-                                console.log(result);
                                 if(result.Response == "Success"){
                                     if(result.Data.Data != undefined){
                                         this.coinHistoryInfo = result.Data.Data;
@@ -228,44 +271,22 @@ export default class CryptoTracker extends LightningElement {
                                     this.updateChart();
                                 } else {
                                     this.hideTickerMessage = false;
-                                }
-                                
+                                }  
                             }).catch(error => {
-                                console.log(error);
-                                this.dispatchEvent(
-                                    new ShowToastEvent({
-                                        title: 'Error loading asset',
-                                        message: error.message,
-                                        variant: 'error',
-                                    }),
-                                );
+                                this.dispatchError(error);
                             });
                         } else {
                             this.hideTickerMessage = false;
                         }
                     }).catch(error => {
-                        console.log(error);
-                        this.dispatchEvent(
-                            new ShowToastEvent({
-                                title: 'Error loading asset',
-                                message: error.message,
-                                variant: 'error',
-                            }),
-                        );
+                        this.dispatchError(error);
                     })
                 }
                 else {
                     this.hideTickerMessage = false;
                 }
             }).catch(error => {
-                console.log(error);
-                this.dispatchEvent(
-                    new ShowToastEvent({
-                        title: 'Error loading asset',
-                        message: error.message,
-                        variant: 'error',
-                    }),
-                );
+                this.dispatchError(error);
             })
         }
     }
