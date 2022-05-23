@@ -252,8 +252,9 @@ export default class CryptoTracker extends LightningElement {
 
     tickerChangeHandler(event) {
         const tickerCoin = event.target.value.toUpperCase();
+        const tickerSize = event.target.value.length;
         const isEnter = event.keyCode === 13;
-        if (isEnter) {
+        if (isEnter || tickerSize >= 3) {
             assetIdLookup({ ticker: tickerCoin }).then(result => {
                 if (result.content != undefined) {
                     this.hideTickerMessage = true;
